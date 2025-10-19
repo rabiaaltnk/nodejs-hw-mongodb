@@ -7,6 +7,7 @@ const {
   deleteContactService,
 } = require('../services/contacts');
 
+
 async function getAllContactsController(req, res) {
   const {
     page = 1,
@@ -17,7 +18,8 @@ async function getAllContactsController(req, res) {
     type,
   } = req.query;
 
-  const filter = {};
+  const filter = { userId: req.user._id };
+
   if (isFavourite !== undefined) filter.isFavourite = isFavourite === 'true';
   if (type) filter.contactType = type;
 
@@ -48,9 +50,12 @@ async function getAllContactsController(req, res) {
   });
 }
 
+
 async function getContactByIdController(req, res) {
   const { contactId } = req.params;
-  const contact = await getContactByIdService(contactId);
+
+  const contact = await getContactByIdService(contactId, req.user._id);
+
   if (!contact) throw createError(404, 'Contact not found');
   return res.status(200).json({
     status: 200,
@@ -59,8 +64,14 @@ async function getContactByIdController(req, res) {
   });
 }
 
+
 async function createContactController(req, res) {
-  const created = await createContactService(req.body);
+
+  const created = await createContactService({
+    ...req.body,
+    userId: req.user._id,
+  });
+
   return res.status(201).json({
     status: 201,
     message: 'Successfully created a contact!',
@@ -70,7 +81,10 @@ async function createContactController(req, res) {
 
 async function patchContactController(req, res) {
   const { contactId } = req.params;
-  const updated = await patchContactService(contactId, req.body || {});
+
+  
+  const updated = await patchContactService(contactId, req.body || {}, req.user._id);
+
   if (!updated) throw createError(404, 'Contact not found');
   return res.status(200).json({
     status: 200,
@@ -81,7 +95,10 @@ async function patchContactController(req, res) {
 
 async function deleteContactController(req, res) {
   const { contactId } = req.params;
-  const deleted = await deleteContactService(contactId);
+
+  
+  const deleted = await deleteContactService(contactId, req.user._id);
+
   if (!deleted) throw createError(404, 'Contact not found');
   return res.status(204).end();
 }
