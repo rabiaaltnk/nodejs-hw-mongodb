@@ -5,6 +5,9 @@ const {
   refreshSession,
   logoutSession,
 } = require('../services/auth');
+const nodemailer = require('nodemailer');
+const jwt = require('jsonwebtoken');
+const { User } = require('../db/models/user');
 
 const cookieName = process.env.COOKIE_NAME || 'refreshToken';
 
@@ -82,9 +85,92 @@ async function logoutController(req, res, next) {
   }
 }
 
+// 🔹 Şifre Sıfırlama E-Postası Gönderimi
+async function sendResetEmailController(req, res, next) {
+  try {
+    const { email } = req.body;
+    if (!email) throw createError(400, 'Email is required');
+
+    const user = await User.findOne({ email });
+    if (!user) throw createError(404, 'User not found!');
+
+    const token = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '5m' });
+    const resetLink = `${process.env.APP_DOMAIN}/reset-password?token=${token}`;
+
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASSWORD,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.SMTP_FROM,
+      to: email,
+      subject: 'Password Reset Request',
+      html: `
+        <p>Merhaba ${user.name || 'kullanıcı'},</p>
+        <p>Şifreni sıfırlamak için aşağıdaki bağlantıya tıkla:</p>
+        <a href="${resetLink}">${resetLink}</a>
+        <p>Bu bağlantı 5 dakika içinde geçersiz olacaktır.</p>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({
+      status: 200,
+      message: 'Reset password email has been successfully sent.',
+      data: {},
+    });
+  } catch (error) {
+    console.error('Email gönderim hatası:', error);
+    next(createError(500, 'Failed to send the email, please try again later.'));
+  }
+}
+
+// 🔹 Şifre Sıfırlama İşlemi
+async function resetPasswordController(req, res, next) {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) throw createError(400, 'Token and new password are required');
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      throw createError(401, 'Token is expired or invalid.');
+    }
+
+    const user = await User.findOne({ email: decoded.email });
+    if (!user) throw createError(404, 'User not found!');
+
+    // Yeni şifreyi kaydet
+    user.password = password;
+    await user.save();
+
+    // Mevcut oturumu sil (refresh token sıfırlama)
+    await logoutSession(user._id);
+
+    res.status(200).json({
+      status: 200,
+      message: 'Password has been successfully reset.',
+      data: {},
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   registerController,
   loginController,
   refreshController,
   logoutController,
+  sendResetEmailController,
+  resetPasswordController,
 };

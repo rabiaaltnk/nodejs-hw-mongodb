@@ -4,6 +4,8 @@ const {
   loginController,
   refreshController,
   logoutController,
+  sendResetEmailController,
+  resetPasswordController 
 } = require('../controllers/auth');
 
 const router = express.Router();
@@ -20,4 +22,9 @@ router.post('/refresh', refreshController);
 // Çıkış yapma
 router.post('/logout', logoutController);
 
-module.exports = router;
+// ✅ Şifre sıfırlama e-postası gönderimi
+router.post('/send-reset-email', sendResetEmailController);
+
+router.post('/reset-pwd', resetPasswordController);
+
+module.exports = router; 
