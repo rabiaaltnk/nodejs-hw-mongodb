@@ -18,9 +18,10 @@ function setupServer() {
   app.use('/auth', authRouter);
   app.use('/contacts', contactsRouter);
 
-  
+ 
   app.get('/', (_req, res) => res.json({ ok: true, routes: ['/auth', '/contacts'] }));
 
+  
   app.use(notFoundHandler);
   app.use(errorHandler);
 
